@@ -36,6 +36,6 @@ When choosing the most deleterious effect, Ensembl's Variant Effect Predictor (V
 
 To run the variant annotation tool, a vcf file and output path should be provided by the user. An example command is provided:
 ```bash
-cd VCFannotator
+cd vcfAnnotator
 Rscript annotate_vcf.R '../data/Challenge_data_(1).vcf' ../data/Challenge_data_annotated.txt
 ```
