@@ -11,7 +11,7 @@ R version 3.6.2 or later and the following R packages:
 
 Clone repo to local computer
 ```bash
-git clone https://github.com/katharineyu/VCFannotator.git
+git clone https://github.com/katzyu/vcfAnnotator.git
 ```
 Install the package dependencies in R:
 
@@ -33,7 +33,7 @@ The variant annotation tool takes in a VCF file and extracts the following annot
 9. Effect of variant (e.g. intergenic_variant, transcript_ablation)
 10. Allele frequency of variant from ExAC API
 
-When choosing the most deleterious effect, Ensembl's Variant Effect Predictor (VEP) terms were used to rank the variant effects by their potential impact. The table of ranked VEP terms was copied from [Ensembl's Calculated variant consequences page]( http://uswest.ensembl.org/info/genome/variation/prediction/predicted_data.html) and saved as a text file in the data directory (ensembl_vep_table.txt). 
+When choosing the most deleterious effect, [Ensembl's Variant Effect Predictor (VEP)](https://uswest.ensembl.org/info/docs/tools/vep/index.html) terms were used to rank the variant effects by their potential impact. The table of ranked VEP terms was copied from [Ensembl's Calculated variant consequences page]( http://uswest.ensembl.org/info/genome/variation/prediction/predicted_data.html) and saved as a text file in the data directory (ensembl_vep_table.txt). 
 
 ### Annotate VCF file
 
