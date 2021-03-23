@@ -2,12 +2,13 @@
 #
 # Taking a VCF file as input, each variant will be annotated with the following
 # pieces of information:
-#  1. Type of variation (substitution, insertion, CNV, etc.) and their effect (missense,
-#  silent, intergenic, etc.). If there are multiple effects, annotate with the
-#  most deleterious possibility.
+#  1. Type of variation (substitution, insertion, CNV, etc.) and their effect
+#     (missense, silent, intergenic, etc.). If there are multiple effects,
+#     annotate with the most deleterious possibility.
 #  2. Depth of sequence coverage at the site of variation.
 #  3. Number of reads supporting the variant.
-#  4. Percentage of reads supporting the variant versus those supporting reference reads.
+#  4. Percentage of reads supporting the variant versus those supporting
+#     reference reads.
 #  5. Allele frequency of variant from ExAC API
 
 #-----------------------------------------------------------------------
@@ -21,7 +22,7 @@ library(jsonlite)
 #                        Function definitions
 #-----------------------------------------------------------------------
 
-check_vcf_file <- function(input_file){
+check_vcf_file <- function(input_file) {
   if (!file.exists(input_file) | dir.exists(input_file)) {
     stop("File not found. Please enter a VCF file.")
   }
@@ -34,24 +35,24 @@ check_vcf_file <- function(input_file){
   }
 }
 
-check_output_dir <- function(output_file){
+check_output_dir <- function(output_file) {
   if (!dir.exists(dirname(output_file))) {
     stop("Output directory does not exist.")
   }
 }
 
 extract_colnames <- function(vcf_file) {
-  # search for line containing #CHROM which indicates a line with
+  # search for line containing #CHROM which indicates the line with
   # the variant column names
   con <- file(vcf_file, "r")
-  while ( TRUE ) {
+  while (TRUE) {
     line <- readLines(con, n = 1)
     if (grepl("#CHROM", line)) {
       break
     }
   }
   close(con)
-  
+
   # remove # sign from column names and split string
   line <- gsub("#", "", line)
   line <- strsplit(line, "\t")[[1]]
@@ -60,8 +61,8 @@ extract_colnames <- function(vcf_file) {
 
 read_vcf <- function(vcf_file) {
   # read in vcf variant data
-  data <- read.table(vcf_file, sep = "\t", comment.char = "#", stringsAsFactors = F)
-  
+  data <- read.table(vcf_file, sep = "\t", comment.char = "#",
+                     stringsAsFactors = FALSE)
   # find column names from vcf file and set colnames
   vcf_colnames <- extract_colnames(vcf_file)
   colnames(data) <- vcf_colnames
@@ -75,14 +76,43 @@ parse_vcf_info <- function(info_entry) {
   return(info_data)
 }
 
+get_variant_type <- function(vcf_info) {
+  variant_type <- as.character(vcf_info["TYPE"])
+  return(variant_type)
+}
+
+get_total_read_depth <- function(vcf_info) {
+  # get total read depth at locus
+  total_read_depth <- as.numeric(vcf_info["DP"])
+  return(total_read_depth)
+}
+
+get_alt_depth <- function(vcf_info) {
+  # get number of alt reads
+  alt_depth <- as.numeric(strsplit(vcf_info["AO"], ",")[[1]])
+  if (length(alt_depth) > 1) {
+    # If there are multiple alt variants, sum the alt counts
+    alt_depth <- sum(alt_depth)
+  }
+  return(alt_depth)
+}
+
+get_alt_pct <- function(alt_depth, total_read_depth) {
+  # get percent of alt reads/total reads
+  pct_alt <- alt_depth / total_read_depth * 100
+  return(pct_alt)
+}
+
 generate_vep_scores <- function(ensembl_vep_table) {
   # Creates a named vector of ensembl VEP scores from VEP table
   # names = effect (e.g. missense_variant), values = score
   # VEP scores reflect the impact of effect (high score = more deleterious)
   # Table was copied and saved as a tsv from:
   # http://uswest.ensembl.org/info/genome/variation/prediction/predicted_data.html
-  ensembl_vep_table <- read.table(ensembl_vep_table, sep = "\t", header = T)
+  ensembl_vep_table <- read.table(ensembl_vep_table, sep = "\t", header = TRUE)
   ensembl_vep_table$score <- seq(nrow(ensembl_vep_table), 1, -1)
+
+  # make named vector with effect:score pairs
   ensembl_vep_scores <- c(ensembl_vep_table$score)
   names(ensembl_vep_scores) <- ensembl_vep_table$SO.term
   return(ensembl_vep_scores)
@@ -90,35 +120,38 @@ generate_vep_scores <- function(ensembl_vep_table) {
 
 query_exac_api_bulk <- function(exac_query) {
   # Submits bulk query to ExAC REST API
-  query_results <- POST("http://exac.hms.harvard.edu/rest/bulk/variant/variant", body = toJSON(exac_query))
-  
+  query_results <- POST("http://exac.hms.harvard.edu/rest/bulk/variant/variant",
+                        body = toJSON(exac_query))
   # check response code status
-  if (query_results$status_code != 200){
+  if (query_results$status_code != 200) {
     stop("ExAC query failed. Please check internet connection or ExAC server.")
   }
   query_results <- fromJSON(rawToChar(query_results$content))
   return(query_results)
 }
 
-get_exac_query_name <- function(exac_annotations_raw_entry){
+get_exac_query_name <- function(exac_annotations_raw_entry) {
   exac_query <- names(exac_annotations_raw_entry)
   return(exac_query)
 }
 
-get_vep_consequence <- function(exac_annotations_raw_entry, ensembl_vep_scores){
+get_vep_consequence <- function(exac_annotations_raw_entry,
+                                ensembl_vep_scores) {
   vep_consequence <- exac_annotations_raw_entry[[1]]$vep_annotations$Consequence[1]
   if (is.null(vep_consequence)) {
     # If no consequence is found, replace NULL with NA
     vep_consequence <- NA
   } else {
-    # If consequence is found, return most deleterious consequence based on VEP score
+    # If consequence is found, return most deleterious consequence
+    # based on VEP score
     vep_consequence_list <- strsplit(vep_consequence, "&")[[1]]
-    vep_consequence <- names(ensembl_vep_scores)[ensembl_vep_scores == max(ensembl_vep_scores[vep_consequence_list])]
+    vep_consequence <- names(ensembl_vep_scores)[ensembl_vep_scores ==
+                                                   max(ensembl_vep_scores[vep_consequence_list])]
   }
   return(vep_consequence)
 }
 
-get_allele_freq <- function(exac_annotations_raw_entry){
+get_allele_freq <- function(exac_annotations_raw_entry) {
   allele_frequency <- exac_annotations_raw_entry[[1]]$allele_freq
   if (is.null(allele_frequency)) {
     allele_frequency <- NA
@@ -138,11 +171,13 @@ generate_exac_annotations <- function(exac_queries, ensembl_vep_scores) {
   print("Extracting features of interest from ExAC query results")
   exac_annotations <- data.frame()
   pb <- txtProgressBar(min = 0, max = length(exac_annotations_raw), style = 3)
-  for (i in 1:length(exac_annotations_raw)) {
+  for (i in seq_len(length(exac_annotations_raw))) {
     exac_query <- get_exac_query_name(exac_annotations_raw[i])
-    vep_consequence <- get_vep_consequence(exac_annotations_raw[i], ensembl_vep_scores)
+    vep_consequence <- get_vep_consequence(exac_annotations_raw[i],
+                                           ensembl_vep_scores)
     allele_frequency <- get_allele_freq(exac_annotations_raw[i])
-    exac_annotations <- rbind(exac_annotations, cbind(exac_query, vep_consequence, allele_frequency))
+    exac_annotations <- rbind(exac_annotations,
+                              cbind(exac_query, vep_consequence, allele_frequency))
     setTxtProgressBar(pb, i)
   }
   close(pb)
@@ -153,33 +188,6 @@ generate_exac_annotations <- function(exac_queries, ensembl_vep_scores) {
   return(exac_annotations)
 }
 
-get_variant_type <- function(vcf_info){
-  variant_type <- as.character(vcf_info["TYPE"])
-  return(variant_type)
-}
-
-get_total_read_depth <- function(vcf_info){
-  # get total read depth at locus
-  total_read_depth <- as.numeric(vcf_info["DP"])
-  return(total_read_depth)
-}
-
-get_alt_depth <- function(vcf_info){
-  # get number of alt reads 
-  alt_depth <- as.numeric(strsplit(vcf_info["AO"], ",")[[1]])
-  if (length(alt_depth) > 1) {
-    # If there are multiple alt variants, sum the alt counts
-    alt_depth <- sum(alt_depth)
-  }
-  return(alt_depth)
-}
-
-get_alt_pct <- function(alt_depth, total_read_depth){
-  # get percent of alt reads/total reads
-  pct_alt <- alt_depth / total_read_depth * 100
-  return(pct_alt)
-}
-
 annotate_vcf <- function(vcf_file, num_lines = -1) {
   # Main function to create the annotated vcf data frame
   vcf <- read_vcf(vcf_file)
@@ -188,20 +196,21 @@ annotate_vcf <- function(vcf_file, num_lines = -1) {
   print("Extracting features of interest from vcf file:")
   annotated_vcf <- data.frame()
   pb <- txtProgressBar(min = 0, max = nrow(vcf), style = 3)
-  for (i in 1:nrow(vcf)) {
+  for (i in seq_len(nrow(vcf))) {
     chrom <- vcf$CHROM[i]
     pos <- vcf$POS[i]
     ref <- vcf$REF[i]
     alt <- vcf$ALT[i]
-    
+
     # Get read depth, alt depth, and alt percent from INFO column
     vcf_info <- parse_vcf_info(vcf$INFO[i])
     variant_type <- get_variant_type(vcf_info)
     total_read_depth <- get_total_read_depth(vcf_info)
     alt_depth <- get_alt_depth(vcf_info)
     pct_alt <- get_alt_pct(alt_depth, total_read_depth)
-    
-    annotated_vcf <- rbind(annotated_vcf, cbind(chrom, pos, ref, alt, variant_type, total_read_depth, alt_depth, pct_alt))
+
+    annotated_vcf <- rbind(annotated_vcf,
+                           cbind(chrom, pos, ref, alt, variant_type, total_read_depth, alt_depth, pct_alt))
     setTxtProgressBar(pb, i)
   }
   close(pb)
