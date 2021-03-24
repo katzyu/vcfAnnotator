@@ -105,9 +105,9 @@ get_alt_pct <- function(alt_depth, total_read_depth) {
 
 generate_vep_scores <- function(ensembl_vep_table) {
   # Creates a named vector of ensembl VEP scores from VEP table
-  # names = effect (e.g. missense_variant), values = score
-  # VEP scores reflect the impact of effect (high score = more deleterious)
-  # Table was copied and saved as a tsv from:
+  # higher score = more deleterious effect
+  # VEP scores are based on Ensembl's calculated variant
+  # consequences table which ranked the effects by severity:
   # http://uswest.ensembl.org/info/genome/variation/prediction/predicted_data.html
   ensembl_vep_table <- read.table(ensembl_vep_table, sep = "\t", header = TRUE)
   ensembl_vep_table$score <- seq(nrow(ensembl_vep_table), 1, -1)
@@ -143,12 +143,30 @@ get_vep_consequence <- function(exac_annotations_raw_entry,
     vep_consequence <- NA
   } else {
     # If consequence is found, return most deleterious consequence
-    # based on VEP score
+    # based on highest VEP score
     vep_consequence_list <- strsplit(vep_consequence, "&")[[1]]
     vep_consequence <- names(ensembl_vep_scores)[ensembl_vep_scores ==
                                                    max(ensembl_vep_scores[vep_consequence_list])]
   }
   return(vep_consequence)
+}
+
+get_gene_symbol <- function(exac_annotations_raw_entry) {
+  gene_symbol <- exac_annotations_raw_entry[[1]]$vep_annotations$SYMBOL[1]
+  if (is.null(gene_symbol)) {
+    # If no consequence is found, replace NULL with NA
+    gene_symbol <- NA
+  } 
+  return(gene_symbol)
+}
+
+get_ensembl_gene_id <- function(exac_annotations_raw_entry) {
+  gene_id <- exac_annotations_raw_entry[[1]]$vep_annotations$Gene[1]
+  if (is.null(gene_id)) {
+    # If no consequence is found, replace NULL with NA
+    gene_id <- NA
+  } 
+  return(gene_id)
 }
 
 get_allele_freq <- function(exac_annotations_raw_entry) {
@@ -167,7 +185,8 @@ generate_exac_annotations <- function(exac_queries, ensembl_vep_scores) {
   print("Querying ExAC API")
   exac_annotations_raw <- query_exac_api_bulk(exac_queries)
 
-  # Extract VEP consequences and allele frequency info from ExAC query results
+  # Extract VEP consequences, allele frequency, and gene info from 
+  # ExAC query results
   print("Extracting features of interest from ExAC query results")
   exac_annotations <- data.frame()
   pb <- txtProgressBar(min = 0, max = length(exac_annotations_raw), style = 3)
@@ -175,9 +194,13 @@ generate_exac_annotations <- function(exac_queries, ensembl_vep_scores) {
     exac_query <- get_exac_query_name(exac_annotations_raw[i])
     vep_consequence <- get_vep_consequence(exac_annotations_raw[i],
                                            ensembl_vep_scores)
+    gene_symbol <- get_gene_symbol(exac_annotations_raw[i])
+    ensembl_gene_id <- get_ensembl_gene_id(exac_annotations_raw[i])
     allele_frequency <- get_allele_freq(exac_annotations_raw[i])
     exac_annotations <- rbind(exac_annotations,
-                              cbind(exac_query, vep_consequence, allele_frequency))
+                              cbind(exac_query, vep_consequence,
+                                    gene_symbol, ensembl_gene_id,
+                                    allele_frequency))
     setTxtProgressBar(pb, i)
   }
   close(pb)

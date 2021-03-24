@@ -31,9 +31,11 @@ The variant annotation tool takes in a VCF file and extracts the following annot
 7. Number of reads supporting the variant.
 8. Percent of reads supporting variant
 9. Effect of variant (e.g. intergenic_variant, transcript_ablation)
-10. Allele frequency of variant from ExAC API
+10. HGNC Gene Symbol
+11. Ensembl Gene ID
+12. Allele frequency of variant from ExAC API
 
-When choosing the most deleterious effect, [Ensembl's Variant Effect Predictor (VEP)](https://uswest.ensembl.org/info/docs/tools/vep/index.html) terms were used to rank the variant effects by their potential impact. The table of ranked VEP terms was copied from [Ensembl's Calculated variant consequences page]( http://uswest.ensembl.org/info/genome/variation/prediction/predicted_data.html) and saved as a text file in the data directory (ensembl_vep_table.txt). 
+When choosing the most deleterious effect, [Ensembl's Variant Effect Predictor (VEP)](https://uswest.ensembl.org/info/docs/tools/vep/index.html) terms were used to rank the variant effects by their potential impact. The table of ranked VEP terms was copied from [Ensembl's Calculated variant consequences page]( http://uswest.ensembl.org/info/genome/variation/prediction/predicted_data.html), which ranked the effects in order of severity. This table was saved as a text file in the data directory (ensembl_vep_table.txt). While software exists to predict pathogenicity scores for variants ( [SIFT](https://sift.bii.a-star.edu.sg/), [PolyPhen](http://genetics.bwh.harvard.edu/pph2/)), they have academic licenses so I used the simpler Ensembl variant consequences table instead. 
 
 ### Annotate VCF file
 
